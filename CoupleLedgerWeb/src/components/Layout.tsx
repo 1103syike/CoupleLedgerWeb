@@ -14,16 +14,16 @@ export default function Layout() {
       </button>
       <nav className="tabs">
         <NavLink to="/" end className={({ isActive }) => (isActive ? 'active' : '')}>
-          <span>🏠</span>首頁
+          首頁
         </NavLink>
         <NavLink to="/expenses" className={({ isActive }) => (isActive ? 'active' : '')}>
-          <span>📋</span>明細
+          明細
         </NavLink>
         <NavLink to="/balance" className={({ isActive }) => (isActive ? 'active' : '')}>
-          <span>⚖️</span>結算
+          結算
         </NavLink>
         <NavLink to="/settings" className={({ isActive }) => (isActive ? 'active' : '')}>
-          <span>⚙️</span>設定
+          設定
         </NavLink>
       </nav>
       {showForm && (

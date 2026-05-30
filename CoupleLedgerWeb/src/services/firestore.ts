@@ -1,20 +1,19 @@
 import {
   collection,
+  deleteField,
   doc,
   getDoc,
-  getDocs,
-  limit,
   onSnapshot,
   orderBy,
   query,
   setDoc,
   updateDoc,
-  arrayUnion,
   where,
   Timestamp,
   type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
+import { waitForAuthUser } from '../lib/waitForAuth';
 import type { AppUser, CoupleSpace, Expense, ExpenseCategory } from '../lib/types';
 import { generateInviteCode, systemCategoriesForSpace } from '../lib/categories';
 
@@ -41,7 +40,50 @@ const parseExpense = (id: string, data: Record<string, unknown>): Expense => ({
   deletedAt: data.deletedAt ? toDate(data.deletedAt) : null,
 });
 
+export async function probeFirestoreRules(): Promise<string | null> {
+  try {
+    await waitForAuthUser();
+    await getDoc(doc(db, 'invites', '__rules_probe__'));
+    return null;
+  } catch (e) {
+    if (e instanceof Error && e.message === '請先登入') return null;
+    if (e && typeof e === 'object' && 'code' in e && (e as { code: string }).code === 'permission-denied') {
+      return `Firestore 拒絕存取（專案：${import.meta.env.VITE_FIREBASE_PROJECT_ID}）。請確認規則已發布，且 App Check 未強制啟用。`;
+    }
+    return null;
+  }
+}
+
+export async function getOrCreateProfile(uid: string, email: string, displayName: string): Promise<AppUser> {
+  await waitForAuthUser();
+  const ref = doc(db, 'users', uid);
+  const snap = await getDoc(ref);
+  if (snap.exists()) {
+    const d = snap.data();
+    return {
+      id: snap.id,
+      email: d.email as string,
+      displayName: d.displayName as string,
+      spaceId: (d.spaceId as string) ?? null,
+      createdAt: toDate(d.createdAt),
+    };
+  }
+  const user: AppUser = {
+    id: uid,
+    email: email.trim().toLowerCase(),
+    displayName: displayName.trim() || '使用者',
+    spaceId: null,
+    createdAt: new Date(),
+  };
+  await setDoc(ref, {
+    ...user,
+    createdAt: Timestamp.fromDate(user.createdAt),
+  });
+  return user;
+}
+
 export async function saveUser(user: AppUser): Promise<void> {
+  await waitForAuthUser();
   await setDoc(doc(db, 'users', user.id), {
     ...user,
     createdAt: Timestamp.fromDate(user.createdAt),
@@ -49,7 +91,11 @@ export async function saveUser(user: AppUser): Promise<void> {
 }
 
 export async function fetchUser(id: string): Promise<AppUser> {
+  await waitForAuthUser();
   const snap = await getDoc(doc(db, 'users', id));
+  if (!snap.exists()) {
+    throw new Error('USER_NOT_FOUND');
+  }
   const d = snap.data()!;
   return {
     id: snap.id,
@@ -61,6 +107,7 @@ export async function fetchUser(id: string): Promise<AppUser> {
 }
 
 export async function createSpace(name: string, creator: AppUser): Promise<CoupleSpace> {
+  await waitForAuthUser();
   const space: CoupleSpace = {
     id: crypto.randomUUID(),
     name,
@@ -74,6 +121,7 @@ export async function createSpace(name: string, creator: AppUser): Promise<Coupl
     ...space,
     createdAt: Timestamp.fromDate(space.createdAt),
   });
+  await setDoc(doc(db, 'invites', space.inviteCode.toUpperCase()), { spaceId: space.id });
   for (const cat of systemCategoriesForSpace(space.id)) {
     await setDoc(doc(db, 'categories', `${space.id}_${cat.id}`), cat);
   }
@@ -81,29 +129,73 @@ export async function createSpace(name: string, creator: AppUser): Promise<Coupl
   return space;
 }
 
+export async function ensureInviteIndex(space: CoupleSpace): Promise<void> {
+  const code = space.inviteCode.toUpperCase();
+  const ref = doc(db, 'invites', code);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) {
+    await setDoc(ref, { spaceId: space.id });
+  }
+}
+
 export async function findSpaceByInviteCode(code: string): Promise<CoupleSpace | null> {
-  const q = query(collection(db, 'spaces'), where('inviteCode', '==', code.toUpperCase()), limit(1));
-  const snap = await getDocs(q);
-  if (snap.empty) return null;
-  const d = snap.docs[0];
-  const data = d.data();
-  return {
-    id: d.id,
-    name: data.name as string,
-    inviteCode: data.inviteCode as string,
-    memberIds: data.memberIds as string[],
-    memberNames: data.memberNames as Record<string, string>,
-    createdAt: toDate(data.createdAt),
-    createdBy: data.createdBy as string,
-  };
+  await waitForAuthUser();
+  const normalized = code.trim().toUpperCase();
+  if (normalized.length < 6) return null;
+
+  const inviteSnap = await getDoc(doc(db, 'invites', normalized));
+  if (!inviteSnap.exists()) {
+    throw new Error('找不到邀請碼，請請建立者到「設定」按「同步邀請碼」');
+  }
+  return getSpace(inviteSnap.data().spaceId as string);
 }
 
 export async function joinSpace(spaceId: string, user: AppUser): Promise<void> {
-  await updateDoc(doc(db, 'spaces', spaceId), {
-    memberIds: arrayUnion(user.id),
+  await waitForAuthUser();
+  const spaceRef = doc(db, 'spaces', spaceId);
+  const userRef = doc(db, 'users', user.id);
+  const spaceSnap = await getDoc(spaceRef);
+  if (!spaceSnap.exists()) throw new Error('找不到帳本');
+
+  const data = spaceSnap.data();
+  const memberIds = (data.memberIds as string[]) ?? [];
+
+  if (memberIds.includes(user.id)) {
+    await updateDoc(userRef, { spaceId });
+    return;
+  }
+  if (memberIds.length >= 2) throw new Error('此帳本已有兩位成員');
+
+  await updateDoc(spaceRef, {
+    memberIds: [...memberIds, user.id],
     [`memberNames.${user.id}`]: user.displayName,
   });
-  await updateDoc(doc(db, 'users', user.id), { spaceId });
+  await updateDoc(userRef, { spaceId });
+}
+
+export async function removeMember(
+  spaceId: string,
+  creatorId: string,
+  memberIdToRemove: string
+): Promise<void> {
+  await waitForAuthUser();
+  const spaceRef = doc(db, 'spaces', spaceId);
+  const spaceSnap = await getDoc(spaceRef);
+  if (!spaceSnap.exists()) throw new Error('找不到帳本');
+
+  const data = spaceSnap.data();
+  const creator = (data.createdBy as string) ?? ((data.memberIds as string[]) ?? [])[0];
+  if (creator !== creatorId) throw new Error('只有建立者可以移除成員');
+  if (memberIdToRemove === creatorId) throw new Error('無法移除自己');
+
+  const memberIds = (data.memberIds as string[]) ?? [];
+  if (!memberIds.includes(memberIdToRemove)) throw new Error('該使用者不是成員');
+
+  await updateDoc(spaceRef, {
+    memberIds: memberIds.filter((id) => id !== memberIdToRemove),
+    [`memberNames.${memberIdToRemove}`]: deleteField(),
+  });
+  await updateDoc(doc(db, 'users', memberIdToRemove), { spaceId: null });
 }
 
 async function getSpace(id: string): Promise<CoupleSpace> {

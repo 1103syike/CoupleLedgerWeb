@@ -51,58 +51,48 @@ npm run dev
 2. 女友：註冊 → 輸入邀請碼加入  
 3. 任一方記帳，另一方即時同步  
 
-## Git 自動部署（GitHub Actions → Vercel）
+## 部署（Vercel + Git 自動部署）
 
-push 到 `main`（或 `master`）會自動建置並部署網頁版。
+Repo：https://github.com/1103syike/CoupleLedgerWeb  
+Production：https://couple-ledger-web-beta.vercel.app
 
-### 一次性設定
+**Vercel 已連結此 GitHub repo**（Root Directory：`CoupleLedgerWeb`）。  
+push 到 `main` 後 Vercel 會**自動建置並部署**，無需額外設定。
 
-1. **GitHub 儲存庫**  
-   ```bash
-   git init
-   git add .
-   git commit -m "Initial commit"
-   git branch -M main
-   git remote add origin https://github.com/你的帳號/你的-repo.git
-   git push -u origin main
-   ```
+1. 本機 commit 變更
+2. `git push origin main`
+3. 到 [Vercel Deployments](https://vercel.com/1103syikes-projects/couple-ledger-web) 查看進度
 
-2. **Vercel 專案**（[vercel.com](https://vercel.com)）  
-   - 匯入 GitHub repo  
-   - **Root Directory** 設 `CoupleLedgerWeb`  
-   - 在 **Settings → Environment Variables** 加入與 `.env` 相同的 `VITE_FIREBASE_*`（Production / Preview / Development 都加）
+環境變數 `VITE_FIREBASE_*` 已在 Vercel Production / Development 設定完成。
 
-3. **取得 Vercel ID**（本機 `CoupleLedgerWeb` 目錄）  
-   ```bash
-   npx vercel link
-   npx vercel env pull
-   ```
-   或到 Vercel → **Settings → General** 複製 **Project ID**、**Team / Org ID**。
+### 本機立即部署（不等 push）
 
-4. **GitHub Secrets**（repo → Settings → Secrets and variables → Actions）  
+```bash
+cd CoupleLedgerWeb
+npx vercel deploy --prod
+```
 
-   | Secret | 說明 |
-   |--------|------|
-   | `VERCEL_TOKEN` | [vercel.com/account/tokens](https://vercel.com/account/tokens) 建立 |
-   | `VERCEL_ORG_ID` | Vercel Team / User ID |
-   | `VERCEL_PROJECT_ID` | Vercel 專案 ID |
+已安裝 [Vercel Coding Agent Plugin](https://vercel.com/docs/agent-resources/vercel-plugin)。**Reload Window** 後可在 Agent 使用：
 
-   **（選用）Firestore 規則一併自動部署：**
+| 指令 | 用途 |
+|------|------|
+| `/vercel-plugin:bootstrap` | 連結專案、環境變數初始化 |
+| `/vercel-plugin:deploy prod` | 部署到 production |
+| `/vercel-plugin:env` | 管理環境變數 |
+| `/vercel-plugin:status` | 查看部署狀態 |
 
-   | Secret | 說明 |
-   |--------|------|
-   | `FIREBASE_SERVICE_ACCOUNT` | Firebase Console → 專案設定 → 服務帳戶 → 產生 JSON 金鑰（整份 JSON 貼上） |
-   | `FIREBASE_PROJECT_ID` | Firebase 專案 ID |
+首次使用前，在 `CoupleLedgerWeb` 目錄登入 Vercel：
 
-5. push 後到 GitHub **Actions** 分頁查看部署進度。
+```bash
+cd CoupleLedgerWeb
+npx vercel login
+npx vercel link
+```
 
-### 手動部署（不用 CI）
+### Firestore 規則（選用）
 
-1. 將專案推送到 GitHub  
-2. [vercel.com](https://vercel.com) 匯入 repo，Root Directory 設 `CoupleLedgerWeb`  
-3. 在 Vercel 專案設定加入與 `.env` 相同的環境變數（`VITE_FIREBASE_*`）  
-4. Deploy  
-
+GitHub Actions → **Deploy Firestore** 可手動部署規則，需在 Secrets 設定 `FIREBASE_SERVICE_ACCOUNT`、`FIREBASE_PROJECT_ID`。  
+或本機執行：`firebase deploy --only firestore:rules,firestore:indexes`
 ## 資料庫說明
 
 詳見 [firebase/DATABASE.md](firebase/DATABASE.md)。

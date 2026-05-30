@@ -13,7 +13,14 @@ export default function App() {
   const { configured, loading, firebaseUser, profile } = useApp();
 
   if (!configured) return <SetupPage />;
-  if (loading) return <div className="screen center">載入中…</div>;
+  if (loading) {
+    return (
+      <div className="loading-screen">
+        <img src="/hero.png" alt="" className="hero-img" />
+        <span>載入中…</span>
+      </div>
+    );
+  }
 
   if (!firebaseUser) {
     return (

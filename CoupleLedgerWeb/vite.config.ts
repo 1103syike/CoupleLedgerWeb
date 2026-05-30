@@ -8,6 +8,17 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg'],
+      workbox: {
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true,
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/(.*\.)?(googleapis|google|firebaseio|firebaseapp|cloudfunctions)\.com\/.*/i,
+            handler: 'NetworkOnly',
+          },
+        ],
+      },
       manifest: {
         name: '我們的帳本',
         short_name: '帳本',

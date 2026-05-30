@@ -8,7 +8,13 @@ export default function HomePage() {
 
   return (
     <div className="screen">
-      <h1>本月總覽</h1>
+      <div className="page-header">
+        <img src="/hero.png" alt="" className="hero-img" />
+        <div>
+          <h1>本月總覽</h1>
+          <p className="muted" style={{ fontSize: '0.75rem' }}>{space?.name ?? '我們的帳本'}</p>
+        </div>
+      </div>
       <MonthNav />
       <div className="card total" style={{ marginTop: '1rem' }}>
         <div className="muted">本月總支出</div>

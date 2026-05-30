@@ -42,6 +42,7 @@ interface AppContextValue {
   signOut: () => Promise<void>;
   createSpace: (name: string) => Promise<void>;
   joinSpace: (code: string) => Promise<void>;
+  removeMember: (memberId: string) => Promise<void>;
   saveExpense: (e: Expense) => Promise<void>;
   deleteExpense: (id: string) => Promise<void>;
   monthlyTotal: number;
@@ -87,16 +88,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
         } else {
           setSpace(null);
         }
-      } catch {
-        setProfile(null);
-        setSpace(null);
+      } catch (e) {
+        const recovered = await fs.getOrCreateProfile(
+          user.uid,
+          user.email ?? '',
+          user.displayName ?? '使用者'
+        );
+        setProfile(recovered);
+        if (recovered.spaceId) {
+          try {
+            setSpace(await fs.fetchSpace(recovered.spaceId));
+          } catch {
+            setSpace(null);
+          }
+        } else {
+          setSpace(null);
+        }
       }
       setLoading(false);
     });
   }, []);
 
   useEffect(() => {
-    if (!space?.id) return;
+    if (!space?.id || !profile) return;
+    if (space.createdBy === profile.id) {
+      fs.ensureInviteIndex(space).catch(() => {});
+    }
     const u1 = fs.listenSpace(space.id, setSpace);
     const u2 = fs.listenExpenses(space.id, setExpenses);
     const u3 = fs.listenCategories(space.id, setCategories);
@@ -130,25 +147,47 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const createSpace = useCallback(
     async (name: string) => {
-      if (!profile) return;
-      const s = await fs.createSpace(name, profile);
-      setProfile({ ...profile, spaceId: s.id });
+      if (!firebaseUser) throw new Error('請先登入');
+      const activeProfile =
+        profile ??
+        (await fs.getOrCreateProfile(
+          firebaseUser.uid,
+          firebaseUser.email ?? '',
+          firebaseUser.displayName ?? '使用者'
+        ));
+      const s = await fs.createSpace(name, activeProfile);
+      setProfile({ ...activeProfile, spaceId: s.id });
       setSpace(s);
     },
-    [profile]
+    [profile, firebaseUser]
   );
 
   const joinSpace = useCallback(
     async (code: string) => {
-      if (!profile) return;
+      if (!firebaseUser) throw new Error('請先登入');
+      const activeProfile =
+        profile ??
+        (await fs.getOrCreateProfile(
+          firebaseUser.uid,
+          firebaseUser.email ?? '',
+          firebaseUser.displayName ?? '使用者'
+        ));
       const found = await fs.findSpaceByInviteCode(code);
       if (!found) throw new Error('找不到邀請碼');
       if (found.memberIds.length >= 2) throw new Error('此帳本已有兩位成員');
-      await fs.joinSpace(found.id, profile);
-      setProfile({ ...profile, spaceId: found.id });
+      await fs.joinSpace(found.id, activeProfile);
+      setProfile({ ...activeProfile, spaceId: found.id });
       setSpace(await fs.fetchSpace(found.id));
     },
-    [profile]
+    [profile, firebaseUser]
+  );
+
+  const removeMember = useCallback(
+    async (memberId: string) => {
+      if (!firebaseUser || !space || !profile) throw new Error('請先登入');
+      await fs.removeMember(space.id, profile.id, memberId);
+    },
+    [firebaseUser, space, profile]
   );
 
   const saveExpense = useCallback(async (e: Expense) => {
@@ -185,6 +224,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     signOut,
     createSpace,
     joinSpace,
+    removeMember,
     saveExpense,
     deleteExpense,
     monthlyTotal: monthlyTotal(expenses, selectedMonth),

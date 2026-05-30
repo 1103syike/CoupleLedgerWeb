@@ -30,38 +30,44 @@ export default function LoginPage() {
   const err = localError ?? error;
 
   return (
-    <div className="screen">
-      <h1 style={{ marginBottom: '1.5rem' }}>我們的帳本</h1>
-      {isRegister && (
-        <div className="form-group">
-          <label>暱稱</label>
-          <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+    <div className="screen center" style={{ flexDirection: 'column' }}>
+      <div className="auth-card">
+        <div className="hero-wrap">
+          <img src="/hero.png" alt="我們的帳本" className="hero-img lg" />
+          <h1 className="brand-title">我們的帳本</h1>
+          <p className="brand-sub">一起記錄，細細生活</p>
         </div>
-      )}
-      <div className="form-group">
-        <label>Email</label>
-        <input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        {isRegister && (
+          <div className="form-group">
+            <label>暱稱</label>
+            <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+          </div>
+        )}
+        <div className="form-group">
+          <label>Email</label>
+          <input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        </div>
+        <div className="form-group">
+          <label>密碼（至少 6 碼）</label>
+          <input type="password" autoComplete={isRegister ? 'new-password' : 'current-password'} value={password} onChange={(e) => setPassword(e.target.value)} />
+        </div>
+        {err && <p style={{ color: 'var(--danger)', marginBottom: '1rem', fontSize: '0.875rem' }}>{err}</p>}
+        <button type="button" className="btn btn-primary" disabled={busy} onClick={submit}>
+          {isRegister ? '註冊並開始' : '登入'}
+        </button>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          style={{ marginTop: '0.75rem' }}
+          onClick={() => {
+            setIsRegister(!isRegister);
+            setLocalError(null);
+            clearError();
+          }}
+        >
+          {isRegister ? '已有帳號？登入' : '還沒帳號？註冊'}
+        </button>
       </div>
-      <div className="form-group">
-        <label>密碼（至少 6 碼）</label>
-        <input type="password" autoComplete={isRegister ? 'new-password' : 'current-password'} value={password} onChange={(e) => setPassword(e.target.value)} />
-      </div>
-      {err && <p style={{ color: 'var(--danger)', marginBottom: '1rem' }}>{err}</p>}
-      <button type="button" className="btn btn-primary" disabled={busy} onClick={submit}>
-        {isRegister ? '註冊並開始' : '登入'}
-      </button>
-      <button
-        type="button"
-        className="btn btn-ghost"
-        style={{ marginTop: '0.75rem' }}
-        onClick={() => {
-          setIsRegister(!isRegister);
-          setLocalError(null);
-          clearError();
-        }}
-      >
-        {isRegister ? '已有帳號？登入' : '還沒帳號？註冊'}
-      </button>
     </div>
   );
 }

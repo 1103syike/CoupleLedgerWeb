@@ -1,5 +1,11 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app';
-import { getAuth, type Auth } from 'firebase/auth';
+import {
+  browserLocalPersistence,
+  getAuth,
+  indexedDBLocalPersistence,
+  initializeAuth,
+  type Auth,
+} from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -23,7 +29,13 @@ let db: Firestore;
 
 if (isFirebaseConfigured) {
   app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
+  try {
+    auth = initializeAuth(app, {
+      persistence: [indexedDBLocalPersistence, browserLocalPersistence],
+    });
+  } catch {
+    auth = getAuth(app);
+  }
   db = getFirestore(app);
 } else {
   auth = undefined as unknown as Auth;
