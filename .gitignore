@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Build
+dist/
+build/
+
+# Env（含金鑰勿提交）
+.env
+.env.local
+.env.*.local
+
+# Firebase local
+.firebase/
+firebase-debug.log
+
+# Vercel
+.vercel/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+*.log
+
+# TypeScript
+*.tsbuildinfo

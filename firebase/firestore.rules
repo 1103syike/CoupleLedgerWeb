@@ -1,0 +1,62 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function userSpaceId() {
+      return userDoc().data.spaceId;
+    }
+
+    function isMemberOf(spaceId) {
+      return isSignedIn()
+        && userSpaceId() == spaceId
+        && request.auth.uid in get(/databases/$(database)/documents/spaces/$(spaceId)).data.memberIds;
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    match /spaces/{spaceId} {
+      allow read: if isSignedIn() && (
+        request.auth.uid in resource.data.memberIds
+        || resource.data.memberIds.size() < 2
+      );
+      allow create: if isSignedIn()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.auth.uid in request.resource.data.memberIds
+        && request.resource.data.memberIds.size() == 1;
+      allow update: if isSignedIn() && (
+        isMemberOf(spaceId)
+        || (
+          resource.data.memberIds.size() < 2
+          && request.auth.uid in request.resource.data.memberIds
+          && request.resource.data.memberIds.size() <= 2
+        )
+      );
+    }
+
+    match /categories/{categoryId} {
+      allow read: if isSignedIn() && isMemberOf(resource.data.spaceId);
+      allow write: if false;
+    }
+
+    match /expenses/{expenseId} {
+      allow read: if isSignedIn() && isMemberOf(resource.data.spaceId);
+      allow create: if isSignedIn()
+        && isMemberOf(request.resource.data.spaceId)
+        && request.resource.data.createdBy == request.auth.uid;
+      allow update, delete: if isSignedIn()
+        && isMemberOf(resource.data.spaceId);
+    }
+  }
+}
