@@ -35,7 +35,7 @@ export default function LoginPage() {
         <div className="hero-wrap">
           <img src="/hero.png" alt="我們的帳本" className="hero-img lg" />
           <h1 className="brand-title">我們的帳本</h1>
-          <p className="brand-sub">一起記錄，細細生活</p>
+          <p className="brand-sub">一起記帳，慢慢變可愛 ♡</p>
         </div>
         {isRegister && (
           <div className="form-group">
